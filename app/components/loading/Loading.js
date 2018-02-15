@@ -11,6 +11,8 @@ import styles from './Loading.scss';
 import type { ReactIntlMessage } from '../../types/i18nTypes';
 import environment from '../../environment';
 
+alert(process.env.REPORT_URL);
+
 const messages = defineMessages({
   connecting: {
     id: 'loading.screen.connectingToNetworkMessage',
