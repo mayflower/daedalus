@@ -4,10 +4,18 @@ let
 in with nixpkgs { overlays = import "${yarn2nixSrc}/nix-lib/overlay.nix"; };
 
 let
-  nixLib = pkgs.callPackage "${yarn2nixSrc}/nix-lib" {};
+  nixLib = pkgs.callPackage ../yarn2nix-profpatsch/nix-lib {};
+  overrides = {
+    "webpack" = {
+      # checks from which path it is called and contains a syntax error in case of a failure
+      postFixup = ''
+        substituteInPlace $out/bin/webpack.js --replace 'return require(localWebpack);' ""
+      '';
+    };
+  };
 in
 (nixLib.callTemplate ./yarn-package.nix
-  (nixLib.buildNodeDeps ./yarn.nix)).overrideAttrs (oldAttrs: {
+  (nixLib.buildNodeDeps ./yarn.nix overrides)).overrideAttrs (oldAttrs: {
     postInstall = ''
       cd $out
       npm run build

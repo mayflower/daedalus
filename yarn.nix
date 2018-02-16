@@ -1,4 +1,4 @@
-{ fetchgit, fetchurl }: self:
+{ fetchgit, fetchurl, overrides }: self:
   super: let
         registries = {
           yarn = n: v:
@@ -12,7 +12,7 @@
         ] [ "-" "-" ];
         nodeFilePackage = name: version:
           registry: sha1: deps:
-                super._buildNodePackage {
+                super._buildNodePackage ({
                     name = sanitizePackageName name;
                     inherit version;
                     src = fetchurl {
@@ -20,7 +20,7 @@
                       inherit sha1;
                     };
                     nodeBuildInputs = deps;
-                  };
+                  } // (overrides."${name}" or {}));
         nodeGitPackage = name: version:
           url: rev: sha256: deps:
                   super._buildNodePackage {
