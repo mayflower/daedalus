@@ -5,7 +5,7 @@ allDeps: buildNodePackage rec {
       src = removePrefixes [
         "node_modules"
       ] ./.;
-      top = true;
+      top = false;
       nodeBuildInputs = let
         a = allDeps;
         in [

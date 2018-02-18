@@ -10,6 +10,9 @@
           "@"
           "/"
         ] [ "-" "-" ];
+        scopedName = builtins.replaceStrings [ "/" ] [ "-" ];
+        yarnOfflineFile = n: v: "${scopedName n}-${v}.tgz";
+        yarnOfflineGit = n: r: "${scopedName n}-${r}";
         nodeFilePackage = name: version:
           registry: sha1: deps:
                 super._buildNodePackage ({
@@ -19,6 +22,7 @@
                       url = registry name version;
                       inherit sha1;
                     };
+                    yarnOfflineName = yarnOfflineFile name version;
                     nodeBuildInputs = deps;
                   } // (overrides."${name}" or {}));
         nodeGitPackage = name: version:
@@ -28,8 +32,19 @@
                       inherit version;
                       src = fetchgit {
                         inherit url rev sha256;
+                        leaveDotGit = true;
+                        postFetch = ''
+                          mv $out $PWD/gitarchive
+                          cd gitarchive
+                          git archive --format=tar --output ../tarball ${rev}
+                          mv ../tarball $out
+                        '';
                       };
+                      yarnOfflineName = yarnOfflineGit name rev;
                       nodeBuildInputs = deps;
+                      unpackPhase = ''
+                        tar xf $src
+                      '';
                     };
         identityRegistry = url: _: _:
             url;
@@ -5168,7 +5183,7 @@
           ];
           "node-gyp@^3.3.1" = s."node-gyp@3.4.0";
           "node-gyp@^3.6.0" = s."node-gyp@3.6.2";
-          "node-inspector@0.12.8" = g "node-inspector" "0.12.8" "https://github.com/enlight/node-inspector" "accd46758501d8187e55b32b54e3eff65c3fdaa3" "1fy9hhgpk52xkkmdz8mk8x2x3mpqbqv57dsiiaz89pnnf43zvmbb" [
+          "node-inspector@0.12.8" = g "node-inspector" "0.12.8" "https://github.com/enlight/node-inspector" "accd46758501d8187e55b32b54e3eff65c3fdaa3" "06yq498kgbxxxi7z0z9b6wyjjdqb90zp69xgrdslxihakc3ymywz" [
             s."async@~0.9"
             s."biased-opener@~0.2.2"
             s."debug@^2.2.0"
@@ -7414,7 +7429,7 @@
           ];
           "v8-debug@^0.7.7" = s."v8-debug@0.7.7";
           "v8-debug@~0.7.1" = s."v8-debug@0.7.7";
-          "v8-profiler@5.6.5" = g "v8-profiler" "5.6.5" "https://github.com/enlight/v8-profiler.git" "dc3a4e15f06dd6eaca705e69e235d21d5962eaf5" "06s4k0c5sn995cwkc4vciq8lxvdxncmpv2wp69vwqy7gg77k7lqp" [
+          "v8-profiler@5.6.5" = g "v8-profiler.git" "5.6.5" "https://github.com/enlight/v8-profiler.git" "dc3a4e15f06dd6eaca705e69e235d21d5962eaf5" "0ab7zaa5wnv4wdmfhm90q67m3jzp2kxpfn8f3wix9x1dlr3l5a6s" [
             s."nan@^2.3.2"
             s."node-pre-gyp@^0.6.5"
           ];
@@ -7728,7 +7743,7 @@
             s."webpack-core@~0.6.9"
           ];
           "webpack@^1.13.1" = s."webpack@1.14.0";
-          "websocket@1.0.24" = g "websocket" "1.0.24" "git://github.com/frozeman/WebSocket-Node.git" "7004c39c42ac98875ab61126e5b4a925430f592c" "0cprfhbv7128kq7hknaqx060r4pyz9jrqb0z5ka3hv00mlmpphmm" [
+          "websocket@1.0.24" = g "WebSocket-Node.git" "1.0.24" "git://github.com/frozeman/WebSocket-Node.git" "7004c39c42ac98875ab61126e5b4a925430f592c" "14dh6cwlzpzzi8mc28b1l88b7h7j5yak1q6g7mb7z5q33bx88zx9" [
             s."debug@^2.2.0"
             s."nan@^2.3.3"
             s."typedarray-to-buffer@^3.1.2"

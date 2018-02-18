@@ -13,12 +13,37 @@ let
       '';
     };
   };
+  nodeDeps = (removeAttrs (nixLib.buildNodeDeps ./yarn.nix overrides)
+    [ "_buildNodePackage" ]);
+
+  yarnOfflineMirror = pkgs.runCommand ("daedalus-yarn-offline-mirror") {} ''
+    mkdir -p $out
+    ${lib.concatMapStringsSep "\n"
+    (dep:
+      ''
+        echo linking yarn-offline-mirror ${dep.drv.yarnOfflineName}
+        ln -fsT ${dep.drv.src} "$out/${dep.drv.yarnOfflineName}"
+      '')
+    (builtins.attrValues nodeDeps)}
+  '';
 in
-(nixLib.callTemplate ./yarn-package.nix
-  (nixLib.buildNodeDeps ./yarn.nix overrides)).overrideAttrs (oldAttrs: {
-    postInstall = ''
-      cd $out
-      npm run build
+(nixLib.callTemplate ./yarn-package.nix nodeDeps).overrideAttrs (oldAttrs: {
+    dontBuild = false;
+    patchPhase = ''
+      export HOME=$PWD
+      yarn config set yarn-offline-mirror ${yarnOfflineMirror} --offline
+      yarn install --ignore-scripts --offline
+
+      grep -rl '/usr/bin/env' node_modules | \
+        xargs -I@ sed -i 's#/usr/bin/env#${coreutils}/bin/env#' @
+      
+      #cd node_modules/node-sass
+      #yarn run install --offline 
     '';
-    buildInputs = [ strace which yarn nodejs-6_x python electron ] ++ oldAttrs.buildInputs;
+    buildPhase = ''
+      #cd $src
+      yarn run build --offline
+    '';
+    installPhase = '' '';
+    buildInputs = [ strace which yarn nodejs-6_x python electron libsass ] ++ oldAttrs.buildInputs;
   })
