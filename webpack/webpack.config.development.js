@@ -6,10 +6,8 @@
 
 const path = require('path');
 const webpack = require('webpack');
-const validate = require('webpack-validator');
 const merge = require('webpack-merge');
 const formatter = ('eslint-formatter-pretty');
-const Joi = require('webpack-validator').Joi;
 const baseConfig = require('./webpack.config.base');
 const DllReferencePlugin = require("webpack/lib/DllReferencePlugin");
 const ContextReplacementPlugin = require("webpack/lib/ContextReplacementPlugin");
@@ -17,9 +15,7 @@ const HappyPack = require('happypack');
 
 const port = process.env.PORT || 4000;
 
-module.exports = validate(merge(baseConfig, {
-  debug: true,
-
+module.exports = merge(baseConfig, {
   devtool: 'cheap-module-eval-source-map',
 
   entry: [
@@ -40,7 +36,7 @@ module.exports = validate(merge(baseConfig, {
     //     include: SRC_PATHS,
     //   }
     // ],
-    loaders: [
+    rules: [
       {
         test: /\.jsx?$/,
         loader: 'happypack/loader',
@@ -55,17 +51,17 @@ module.exports = validate(merge(baseConfig, {
       {
         test: /\.global\.scss$/,
         loaders: [
-          'style?sourceMap',
-          'css?sourceMap',
-          'sass?sourceMap'
+          'style-loader?sourceMap',
+          'css-loader?sourceMap',
+          'sass-loader?sourceMap'
         ],
       },
       {
         test: /^((?!\.global).)*\.scss$/,
         loaders: [
-          'style?sourceMap',
-          'css?sourceMap&modules&localIdentName=[name]_[local]&importLoaders=1',
-          'sass?sourceMap'
+          'style-loader?sourceMap',
+          'css-loader?sourceMap&modules&localIdentName=[name]_[local]&importLoaders=1',
+          'sass-loader?sourceMap'
         ],
       },
     ]
@@ -81,7 +77,7 @@ module.exports = validate(merge(baseConfig, {
 
     // “If you are using the CLI, the webpack process will not exit with an error code by enabling this plugin.”
     // https://github.com/webpack/docs/wiki/list-of-plugins#noerrorsplugin
-    new webpack.NoErrorsPlugin(),
+    //new webpack.NoErrorsPlugin(),
 
     // NODE_ENV should be production so that modules do not perform certain development checks
     new webpack.DefinePlugin({
@@ -94,14 +90,11 @@ module.exports = validate(merge(baseConfig, {
       context: path.join(__dirname, "../app"),
       manifest: require("../dll/vendor-manifest.json")
     }),
+    new webpack.LoaderOptionsPlugin({
+      debug: true
+    })
   ],
 
   // https://github.com/chentsulin/webpack-target-electron-renderer#how-this-module-works
   target: 'electron-renderer'
-}),
-  {
-    schemaExtension: Joi.object({
-      sassLoader: Joi.any()
-    })
-  }
-);
+});

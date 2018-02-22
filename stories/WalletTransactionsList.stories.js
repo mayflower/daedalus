@@ -1,5 +1,5 @@
 import React from 'react';
-import { storiesOf } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
 import faker from 'faker';
 import moment from 'moment';
 import BigNumber from 'bignumber.js';

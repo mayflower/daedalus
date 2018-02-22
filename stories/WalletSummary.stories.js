@@ -1,5 +1,5 @@
 import React from 'react';
-import { storiesOf } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
 import StoryDecorator from './support/StoryDecorator';
 import WalletSummary from '../app/components/wallet/summary/WalletSummary';
 import BigNumber from 'bignumber.js';

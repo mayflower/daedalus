@@ -3,13 +3,12 @@
  */
 
 const path = require('path');
-const validate = require('webpack-validator');
 const webpack = require('webpack');
 
-module.exports = validate({
+module.exports = {
   cache: true,
   module: {
-    loaders: [{
+    rules: [{
       test: /\.jsx?$/,
       loader: 'babel-loader',
       include: [
@@ -22,7 +21,7 @@ module.exports = validate({
       loader: 'json-loader',
     }, {
       test: /\.md$/,
-      loader: 'html!markdown?gfm=false',
+      loader: 'html-loader!markdown-loader?gfm=false',
     },
     {
       test: /\.(?:png|jpg|svg|otf|ttf)$/,
@@ -45,8 +44,8 @@ module.exports = validate({
 
   // https://webpack.github.io/docs/configuration.html#resolve
   resolve: {
-    extensions: ['', '.js', '.jsx', '.json'],
-    packageMains: ['webpack', 'browser', 'web', 'browserify', ['jam', 'main'], 'main'],
+    extensions: ['.js', '.jsx', '.json'],
+    mainFields: ['webpack', 'browser', 'web', 'browserify', ['jam', 'main'], 'main'],
   },
 
   plugins: [
@@ -64,4 +63,4 @@ module.exports = validate({
     'electron-store',
   ],
 
-});
+};

@@ -1,14 +1,14 @@
 {
-  "presets": ["es2015", "stage-0", "react"],
+  "presets": ["babel-preset-es2015", "babel-preset-stage-0", "babel-preset-react"],
   "plugins": [
-    "add-module-exports",
-    "transform-decorators-legacy",
-    "lodash",
-    ["transform-runtime", {
+    "babel-plugin-add-module-exports",
+    "babel-plugin-transform-decorators-legacy",
+    "babel-plugin-lodash",
+    ["babel-plugin-transform-runtime", {
       "polyfill": true,
       "regenerator": true
     }],
-    ["react-intl", {
+    ["babel-plugin-react-intl", {
       "messagesDir": "./translations/messages/",
       "enforceDescriptions": true,
       "extractSourceLocation": true
@@ -16,15 +16,15 @@
   ],
   "env": {
     "production": {
-      "presets": ["react-optimize"],
+      "presets": ["babel-preset-react-optimize"],
       "plugins": ["babel-plugin-dev-expression"]
     },
     "development": {
-      "presets": ["react-hmre"]
+      "presets": ["babel-preset-react-hmre"]
     },
     "test": {
       "plugins": [
-        ["webpack-loaders", { "config": "./webpack/webpack.config.development.js", "verbose": false }]
+        ["babel-plugin-webpack-loaders", { "config": "./webpack/webpack.config.development.js", "verbose": false }]
       ]
     }
   }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { observable, runInAction } from 'mobx';
-import { storiesOf, action } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
+import { action } from '@storybook/addon-actions';
 import StoryDecorator from './support/StoryDecorator';
 import Sidebar from '../app/components/sidebar/Sidebar';
 import walletsIcon from '../app/assets/images/sidebar/wallet-ic.inline.svg';

@@ -4,13 +4,12 @@
 
 import path from 'path';
 import webpack from 'webpack';
-import validate from 'webpack-validator';
 import ExtractTextPlugin from 'extract-text-webpack-plugin';
 import merge from 'webpack-merge';
-import { Joi } from 'webpack-validator';
 import baseConfig from './webpack.config.base';
+import UglifyJsPlugin from 'uglifyjs-webpack-plugin';
 
-export default validate(merge(baseConfig, {
+export default merge(baseConfig, {
   devtool: 'cheap-module-source-map',
 
   entry: [
@@ -23,21 +22,21 @@ export default validate(merge(baseConfig, {
   },
 
   module: {
-    loaders: [
+    rules: [
       // Extract all .global.css to style.css as is
       {
         test: /\.global\.scss$/,
-        loader: ExtractTextPlugin.extract(
-          'style-loader',
-          'css-loader?importLoaders=1!sass'
-        )
+        loader: ExtractTextPlugin.extract({
+          fallback: 'style-loader',
+          use: 'css-loader?importLoaders=1!sass-loader'
+        })
       },
       {
         test: /^((?!\.global).)*\.scss$/,
-        loader: ExtractTextPlugin.extract(
-          'style-loader',
-          'css-loader?modules&importLoaders=1&localIdentName=[name]_[local]!sass'
-        )
+        loader: ExtractTextPlugin.extract({
+          fallback: 'style-loader',
+          use: 'css-loader?modules&importLoaders=1&localIdentName=[name]_[local]!sass-loader'
+        })
       },
     ]
   },
@@ -53,10 +52,12 @@ export default validate(merge(baseConfig, {
     }),
 
     // Minify without warning messages and IE8 support
-    new webpack.optimize.UglifyJsPlugin({
-      compressor: {
-        screw_ie8: true,
-        warnings: false
+    new UglifyJsPlugin({
+      uglifyOptions:{
+        compressor: {
+          ie8: true,
+          warnings: false
+        }
       }
     }),
 
@@ -66,10 +67,4 @@ export default validate(merge(baseConfig, {
 
   // https://github.com/chentsulin/webpack-target-electron-renderer#how-this-module-works
   target: 'electron-renderer'
-}),
-  {
-    schemaExtension: Joi.object({
-      sassLoader: Joi.any()
-    })
-  }
-);
+});

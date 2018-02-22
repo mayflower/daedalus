@@ -2,13 +2,13 @@
  * Build config for electron 'Main Process' file
  */
 
+import UglifyJsPlugin from 'uglifyjs-webpack-plugin';
 import webpack from 'webpack';
-import validate from 'webpack-validator';
 import merge from 'webpack-merge';
 import path from 'path';
 import baseConfig from './webpack.config.base';
 
-export default validate(merge(baseConfig, {
+export default merge(baseConfig, {
   devtool: 'source-map',
 
   entry: ['babel-polyfill', './electron/main.development'],
@@ -21,17 +21,12 @@ export default validate(merge(baseConfig, {
 
   plugins: [
     // Minify the output
-    new webpack.optimize.UglifyJsPlugin({
-      compressor: {
-        warnings: false
-      }
-    }),
+    new UglifyJsPlugin(),
 
     // Add source map support for stack traces in node
     // https://github.com/evanw/node-source-map-support
     new webpack.BannerPlugin(
-      'require("source-map-support").install();',
-      { raw: true, entryOnly: false }
+      { banner: 'require("source-map-support").install();', raw: true, entryOnly: false }
     ),
 
     // NODE_ENV should be production so that modules do not perform certain development checks
@@ -59,4 +54,4 @@ export default validate(merge(baseConfig, {
   externals: [
     'source-map-support'
   ]
-}));
+});

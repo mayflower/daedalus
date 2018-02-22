@@ -1,5 +1,6 @@
 import React from 'react';
-import { storiesOf, action } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
+import { action } from '@storybook/addon-actions';
 import StoryDecorator from './support/StoryDecorator';
 import AdaRedemptionForm from '../app/components/wallet/ada-redemption/AdaRedemptionForm';
 import AdaRedemptionChoices from '../app/components/wallet/ada-redemption/AdaRedemptionChoices';

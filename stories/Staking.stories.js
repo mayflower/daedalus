@@ -1,5 +1,5 @@
 import React from 'react';
-import { storiesOf } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
 import StoryDecorator from './support/StoryDecorator';
 import Staking from '../app/components/staking/Staking';
 import StakingSwitch from '../app/components/staking/StakingSwitch';

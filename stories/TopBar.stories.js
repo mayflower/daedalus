@@ -1,5 +1,5 @@
 import React from 'react';
-import { storiesOf } from '@kadira/storybook';
+import { storiesOf } from '@storybook/react';
 import StoryDecorator from './support/StoryDecorator';
 import SidebarLayout from '../app/components/layout/SidebarLayout';
 import TopBar from '../app/components/layout/TopBar';
