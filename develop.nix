@@ -1,7 +1,7 @@
 with (import (fetchTarball https://github.com/NixOS/nixpkgs/archive/29013598a716a4d6c4ef5.tar.gz) {});
 # NOTE: when bumping nixpkgs, also update .travis.yaml
 
-let electronPackages = (import ../nodePackages/electron {});
+let electronPackages = (import ./nodePackages/electron {});
 in stdenv.mkDerivation {
   name = "daedalus";
 
