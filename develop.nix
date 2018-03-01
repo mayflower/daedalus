@@ -28,50 +28,63 @@ in stdenv.mkDerivation {
   src = null;
 
   shellHook = ''
-    yarnlock2json() {
+    yarnlock2nix() {
       node -e '
         const lockfile = require("@yarnpkg/lockfile");
         const fs = require("fs");
-        const semver = require("semver");
 
         const yarnLock = fs.readFileSync("yarn.lock", "utf8");
         const json = lockfile.parse(yarnLock).object;
         const keys = Object.keys;
 
-        const split = k => k.match(/^(@?[^@]+)@([^@]+)$/);
-        const valid = k => semver.valid(k);
-        const entry = k => { return {[split(k)[1]]: split(k)[2]} };
-        const uniqe = a => {
-          let r = [];
-          a.forEach(v => -1 < r.indexOf(v) ? null : r.push(v))
-          return r;
-        }
-        const merge = (a, b) => { 
-          let r = {};
-          keys(a).forEach(k => r[k] = a[k]); 
-          keys(b||{}).forEach(k => r[k] = b[k]);
-          return r;
-        };
-        const hoist = a => {
-          let r = {};
-          a.forEach(o => keys(o).forEach(k => {
-            if (!r[k]) r[k] = [[],[]];
-            r[k][0] = uniqe(r[k][0].concat(json[k + "@" + o[k]].version))
-            if (valid(o[k])) r[k][0] = uniqe(r[k][0].concat(o[k]))
-            else r[k][1] = uniqe(r[k][1].concat(o[k]))
-          }))
-          return r;
-        };
+        const splitKey = k => k.match(/^(@?[^@]+)@([^@]+)$/);
+        const splitUrl = k => k.match(/^([^#]+)#([^#]+)$/);
         
-        const flat = o => keys(o).map(
-          k => merge(entry(k), o[k].dependencies)
+        const source = ({key, name, packageName, version, src, dependencies}) => 
+          `
+          "''${key}" = nodeEnv.buildNodePackage {
+            name = "''${name}-''${version}";
+            packageName = "''${packageName}";
+            version = "''${version}";
+            src = ''${src};
+          ` + (dependencies ? `  dependencies = [''${dependencies.join("")}
+            ];` : "") + `
+            dontBuildNpm = true;
+          };`
+
+        const fetchurl = ({url, sha1}) => 
+        `fetchurl {
+              url = "''${url}";
+              sha1 = "''${sha1}";
+            }`
+
+        const dependencies = o => keys(o||{}).map(
+          //TODO rec; sources
+          k => `
+              "''${k}@''${o[k]}"`
         );
 
-        const fix = hoist(flat(json));
-        console.log(JSON.stringify(fix, null, "  "));
+        const entries = o => keys(o).map(k => {
+          let v = o[k];
+          return source({
+            key: k,
+            //TODO normalize / in name
+            name: splitKey(k)[1],
+            packageName: splitKey(k)[1],
+            version: v.version,
+            //TODO fetchgit
+            src: fetchurl({
+              url: splitUrl(v.resolved)[1],
+              sha1: splitUrl(v.resolved)[2],
+            }),
+            dependencies: dependencies(v.dependencies)
+          });
+        })
+
+        console.log(entries(json).join(""));
       '
     }
-    yarnlock2json
+    yarnlock2nix
     #mkdir -p node_modules
     #rm node_modules/electron -fr
     #ln -sT ${electronPackages.electron}/lib/node_modules/electron node_modules/electron
