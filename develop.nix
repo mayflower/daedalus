@@ -49,7 +49,7 @@ in stdenv.mkDerivation {
             src = ''${src};
           ` + (dependencies ? `  dependencies = [''${dependencies.join("")}
             ];` : "") + `
-            dontBuildNpm = true;
+            dontNpmInstall = true;
           };`
 
         const fetchurl = ({url, sha1}) => 
@@ -58,33 +58,61 @@ in stdenv.mkDerivation {
               sha1 = "''${sha1}";
             }`
 
+        const fetchgit = ({key, url, sha1}) => 
+        `fetchgit {
+              url = "''${url}";
+              rev = "''${sha1}";
+              sha256 = gitShaSumOverride."''${key}";
+            }`
+
         const dependencies = o => keys(o||{}).map(
           //TODO rec; sources
           k => `
-              "''${k}@''${o[k]}"`
+              pkgs."''${k}@''${o[k]}"`
         );
+
+        const src = (s, k) => {
+          if (s.indexOf("git") === 0) {
+            return fetchgit({
+              url: splitUrl(s)[1],
+              sha1: splitUrl(s)[2],
+              key: k
+            });
+          } 
+          return fetchurl({
+            url: splitUrl(s)[1],
+            sha1: splitUrl(s)[2]
+          });
+        }
 
         const entries = o => keys(o).map(k => {
           let v = o[k];
+          
           return source({
             key: k,
             //TODO normalize / in name
-            name: splitKey(k)[1],
+            name: splitKey(k)[1].replace(/[@/]/g, "-"),
             packageName: splitKey(k)[1],
             version: v.version,
-            //TODO fetchgit
-            src: fetchurl({
-              url: splitUrl(v.resolved)[1],
-              sha1: splitUrl(v.resolved)[2],
-            }),
+            src: src(v.resolved, k),
             dependencies: dependencies(v.dependencies)
           });
         })
+        console.log(`{nodeEnv, fetchurl, fetchgit, globalBuildInputs ? [], gitShaSumOverride ? {}}:
 
+rec { pkgs = {
+`);
         console.log(entries(json).join(""));
+        console.log(`
+};
+}
+`);
       '
     }
-    yarnlock2nix
+    yarnlock2nix | tee nodePackages/node-packages.nix
+    cd nodePackages
+    nix-build -A '"websocket@git://github.com/frozeman/WebSocket-Node.git#browserifyCompatible"'
+
     #mkdir -p node_modules
     #rm node_modules/electron -fr
     #ln -sT ${electronPackages.electron}/lib/node_modules/electron node_modules/electron
