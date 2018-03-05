@@ -308,6 +308,51 @@ let
     '';
   };
 
+  buildYarnPackage = { name, packageName, version, dependencies ? [], production ? true, npmFlags ? "", dontNpmInstall ? false, bypassCache ? false, preRebuild ? "", ... }@args:
+
+    let
+      forceOfflineFlag = if bypassCache then "--offline" else "--registry http://www.example.com";
+    in
+    stdenv.lib.makeOverridable stdenv.mkDerivation (builtins.removeAttrs args [ "dependencies" ] // rec {
+      name = "node-${args.name}";
+      buildInputs = [ tarWrapper python nodejs ] ++ stdenv.lib.optional (stdenv.isLinux) utillinux ++ args.buildInputs or [];
+      dontStrip = args.dontStrip or true; # Striping may fail a build for some package deployments
+
+      inherit dontNpmInstall preRebuild;
+
+      removeCircular = args.removeCircular or [];
+
+      unpackPhase = args.unpackPhase or ''
+        if [[ ! -d $src ]] ; then
+          tar tf $src && tar xf $src
+          if [[ ! -d package ]] ; then
+             ls -la
+             cd "$(ls --hide env-vars)"
+          else
+            cd package
+          fi
+        else
+          cd $src
+        fi
+      '';
+
+      buildPhase = args.buildPhase or "true";
+
+      installPhase = args.installPhase or ''
+        mkdir -p $out/node_modules
+        cp -R ./. $out/
+        cd $out
+        ${stdenv.lib.concatStringsSep " " (map (d: ''
+          local packageName="${d.packageName}"
+          
+          if [[ "$packageName" =~ ^@ ]] ; then
+            mkdir -p node_modules/''${packageName%%/*}
+          fi
+          ln -s ${d} node_modules/${d.packageName}
+        '') args.dependencies)}
+      '';
+    });
+
   # Builds and composes an NPM package including all its dependencies
   buildNodePackage = { name, packageName, version, dependencies ? [], production ? true, npmFlags ? "", dontNpmInstall ? false, bypassCache ? false, preRebuild ? "", ... }@args:
 
@@ -494,4 +539,4 @@ let
       '';
     };
 in
-{ inherit buildNodeSourceDist buildNodePackage buildNodeShell; }
+{ inherit buildNodeSourceDist buildYarnPackage buildNodePackage buildNodeShell; }

@@ -15,7 +15,7 @@ let
     globalBuildInputs = with pkgs; [
       nodePackages_6_x.node-pre-gyp electron chromedriver
     ];
-    gitShaSumOverride."websocket@git://github.com/frozeman/WebSocket-Node.git#browserifyCompatible" = "0cprfhbv7128kq7hknaqx060r4pyz9jrqb0z5ka3hv00mlmpphmm";
+    overrides."websocket@1.0.24".sha256 = "0cprfhbv7128kq7hknaqx060r4pyz9jrqb0z5ka3hv00mlmpphmm";
   }).pkgs;
 in
 nodePackages
