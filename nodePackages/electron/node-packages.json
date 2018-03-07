@@ -1,0 +1,11 @@
+[
+  {
+    "electron": "1.7.11",
+    "electron-chromedriver": "1.7.1",
+    "electron-inspector": "git+https://github.com/enlight/electron-inspector.git#9592b52136e06e09003a027653ea16fdd80feff6",
+    "node-inspector": "git+https://github.com/enlight/node-inspector.git#c2dd1eb0129d3d27528a09a8c1d0997f9485ed3c",
+    "v8-debug": "^0.7.7",
+    "v8-profiler": "git+https://github.com/enlight/v8-profiler.git#dc3a4e15f06dd6eaca705e69e235d21d5962eaf5",
+    "yargs": "^5.0.0"
+  }
+]

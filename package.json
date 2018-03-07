@@ -7,7 +7,7 @@
   "scripts": {
     "lint": "eslint --format=node_modules/eslint-formatter-pretty app electron features *.js",
     "hot-server": "cross-env NODE_ENV=development node --preserve-symlinks -r babel-register webpack/server.js",
-    "build-main": "cross-env NODE_ENV=production node -r babel-register ./node_modules/webpack/bin/webpack --config webpack/webpack.config.electron.js --progress --profile --colors",
+    "build-main": "cross-env NODE_ENV=production node --preserve-symlinks -r babel-register ./node_modules/webpack/bin/webpack --config webpack/webpack.config.electron.js --progress --profile --colors",
     "build-renderer": "cross-env NODE_ENV=production node -r babel-register ./node_modules/webpack/bin/webpack --config webpack/webpack.config.production.js --progress --profile --colors",
     "build": "npm run build-main && npm run build-renderer",
     "start": "cross-env NODE_ENV=production electron ./",
@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@kadira/storybook": "2.35.3",
+    "@yarnpkg/lockfile": "^1.0.0",
     "asar": "0.12.4",
     "babel-cli": "6.24.0",
     "babel-core": "6.24.0",
@@ -69,7 +70,6 @@
     "devtron": "1.4.0",
     "electron": "1.7.11",
     "electron-devtools-installer": "2.2.1",
-    "electron-inspector": "0.1.4",
     "electron-packager": "9.1.0",
     "electron-rebuild": "1.6.0",
     "eslint": "3.18.0",
