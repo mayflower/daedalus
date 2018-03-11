@@ -56,7 +56,7 @@ let
       ) dependencies);
 
   # Recursively composes the dependencies of a package
-  composePackage = { name, packageName, src, dependencies ? [], ... }@args:
+  composePackage = { name, packageName, src, dependencies ? [], patchPhase ? "", ... }@args:
     ''
       DIR=$(pwd)
       cd $TMPDIR
@@ -98,6 +98,7 @@ let
 
       # Include the dependencies of the package
       cd "$DIR/${packageName}"
+      ${patchPhase}
       ${includeDependencies { inherit dependencies; }}
       cd ..
       ${stdenv.lib.optionalString (builtins.substring 0 1 packageName == "@") "cd .."}

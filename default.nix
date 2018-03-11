@@ -9,8 +9,28 @@ let
     inherit (pkgs) stdenv python2 utillinux runCommand writeTextFile;
     inherit nodejs;
   };
+  inherit (pkgs) lib;
 in
-import ./node-packages.nix {
-  inherit (pkgs) fetchurl fetchgit;
+(import ./node-packages.nix {
+  inherit (pkgs) fetchurl fetchgit lib;
   inherit nodeEnv;
-}
+  globalBuildInputs = with pkgs; [ electron flow ];
+  # FIXME
+  src = lib.cleanSource (lib.cleanSourceWith { src = ./.; filter = (name: type: name != "node_modules"); });
+  overrides = let
+    find-cache-dir-patch = ''
+      ls -l
+      substituteInPlace index.js \
+        --replace \
+          "dir = path.join(dir, 'node_modules', '.cache', name);" \
+          "dir = path.join('/tmp/npm-cache', name);"
+    '';
+  in {
+    "find-cache-dir-0.1.1".patchPhase = find-cache-dir-patch;
+    "find-cache-dir-1.0.0".patchPhase = find-cache-dir-patch;
+  };
+}).package.overrideAttrs (attrs: {
+  postInstall = ''
+    npm run build
+  '';
+})
