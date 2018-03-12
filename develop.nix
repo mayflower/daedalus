@@ -7,20 +7,8 @@ with (import (fetchTarball https://github.com/NixOS/nixpkgs/archive/29013598a716
     #electronPackages.electron
     #electronPackages.electron-chromedriver
 with builtins; let
-  mkPackageJson = path: module: ''
+  readPackageJson = path: module: ''
     jq '(..|select(numbers)) |= tostring' ${path}/${module}/package.json
-  '';
-
-  mkYarnListJson = ''
-    yarn list --json | jq '
-      def s(m): {key: m.name, value: m.children|(map(s(.))|from_entries)};
-      .data.trees |
-        map(del( 
-          .. | 
-            .hint?, .color?, .shadow?, .depth?,
-            (objects | select(has("depth") == false))
-        )) | map(s(.)) | from_entries' \
-    > yarn-list.json
   '';
 
   yarnLock = readFile ./yarn.lock;
@@ -36,16 +24,15 @@ with builtins; let
       attr = match "(@?[^@]+)@(.*)" module;
       name = elemAt attr 0;
       version = elemAt attr 1;
-      resolved = resolve name version;
+      resolved = trace "resolve ${name}@${version} from yarn.lock"
+        (resolve name version);
       children = walkModules tree.${module};
     in
     [{
       name = module;
       value = {
-        src = {
-          url = elemAt resolved 0;
-          sha1 = elemAt resolved 1;
-        };
+        url = elemAt resolved 0;
+        sha1 = elemAt resolved 1;
       };
     }] ++ children) (attrNames tree);
 
@@ -54,8 +41,24 @@ with builtins; let
     inherit tree;
   };
 
-  mkYarnNix = toFile "daedalus-yarn-nix"
-    (toJSON (addSrcs (fromJSON (readFile ./yarn-list.json))));
+  toYarnTree = yarnListJson:
+    listToAttrs (filter (v: !isNull v) (map (module:
+      if hasAttr "shadow" module && module.shadow then null
+        else {
+          name = module.name;
+          value = if ! hasAttr "children" module then []
+            else toYarnTree module.children;
+        }
+      ) yarnListJson));
+
+  toYarnJson = file: target: toFile "${target}-yarnix.json"
+    (toJSON (addSrcs (toYarnTree (fromJSON (readFile file)).data.trees)));
+
+  mkYarnNix = target: ''
+    yarn list --json > ./yarnix.json
+    echo ${toYarnJson (./. + "/yarnix.json") target}
+  '';
+
 in
 stdenv.mkDerivation {
   name = "daedalus";
@@ -81,17 +84,7 @@ stdenv.mkDerivation {
   src = null;
 
   shellHook = ''
-    #jq '(..|select(numbers)) |= tostring' node_modules_/event-stream/package.json
-
-    #yarn list --json | jq '
-    #  def s(m): {key: m.name, value: m.children|(map(s(.))|from_entries)};
-    #  .data.trees |
-    #  map( del( .. | .hint?, .color?, .shadow?, .depth?,
-    #                 (objects | select(has("depth") == false))
-    #  ) ) | map(s(.)) | from_entries' > yarn-list.json
-
-    ${mkYarnListJson}
-    echo ${mkYarnNix}
+    ${mkYarnNix "daedalus"}
 
     return
     yarnlock2nix() {
@@ -100,7 +93,7 @@ stdenv.mkDerivation {
         const semver = require("semver");
         const fs = require("fs");
 
-        const yarnList = fs.readFileSync("yarn-list.json", "utf8");
+        const yarnList = fs.readFileSync("./yarn-list.json", "utf8");
         const yarnListJson = JSON.parse(yarnList);
 
         const walklist = (path, tree) => {
