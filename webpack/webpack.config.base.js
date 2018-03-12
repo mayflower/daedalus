@@ -47,6 +47,15 @@ module.exports = validate({
   resolve: {
     extensions: ['', '.js', '.jsx', '.json'],
     packageMains: ['webpack', 'browser', 'web', 'browserify', ['jam', 'main'], 'main'],
+    //root is needed to find symlinked modules
+    //https://github.com/webpack/docs/wiki/configuration
+    root: path.resolve(__dirname, '../node_modules')
+  },
+
+  resolveLoader: {
+    //root is needed to find symlinked loader modules
+    //https://github.com/webpack/docs/wiki/configuration
+    root: path.resolve(__dirname, '../node_modules')
   },
 
   plugins: [

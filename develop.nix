@@ -6,7 +6,57 @@ with (import (fetchTarball https://github.com/NixOS/nixpkgs/archive/29013598a716
     #electron
     #electronPackages.electron
     #electronPackages.electron-chromedriver
+with builtins; let
+  mkPackageJson = path: module: ''
+    jq '(..|select(numbers)) |= tostring' ${path}/${module}/package.json
+  '';
 
+  mkYarnListJson = ''
+    yarn list --json | jq '
+      def s(m): {key: m.name, value: m.children|(map(s(.))|from_entries)};
+      .data.trees |
+        map(del( 
+          .. | 
+            .hint?, .color?, .shadow?, .depth?,
+            (objects | select(has("depth") == false))
+        )) | map(s(.)) | from_entries' \
+    > yarn-list.json
+  '';
+
+  yarnLock = readFile ./yarn.lock;
+
+  resolve = name: version: match
+    (".*\n.?${name}@[^\n]*\n"
+    + "[ ]*version \"${version}\"\n"
+    + "[ ]*resolved \"([^#]*)#([^\"]*)\"\n"
+    + ".*") yarnLock;
+
+  walkModules = tree: map (module:
+    let
+      attr = match "(@?[^@]+)@(.*)" module;
+      name = elemAt attr 0;
+      version = elemAt attr 1;
+      resolved = resolve name version;
+      children = walkModules tree.${module};
+    in
+    [{
+      name = module;
+      value = {
+        src = {
+          url = elemAt resolved 0;
+          sha1 = elemAt resolved 1;
+        };
+      };
+    }] ++ children) (attrNames tree);
+
+  addSrcs = tree: {
+    srcs = listToAttrs (pkgs.lib.flatten (walkModules tree));
+    inherit tree;
+  };
+
+  mkYarnNix = toFile "daedalus-yarn-nix"
+    (toJSON (addSrcs (fromJSON (readFile ./yarn-list.json))));
+in
 stdenv.mkDerivation {
   name = "daedalus";
 
@@ -31,16 +81,75 @@ stdenv.mkDerivation {
   src = null;
 
   shellHook = ''
+    #jq '(..|select(numbers)) |= tostring' node_modules_/event-stream/package.json
+
+    #yarn list --json | jq '
+    #  def s(m): {key: m.name, value: m.children|(map(s(.))|from_entries)};
+    #  .data.trees |
+    #  map( del( .. | .hint?, .color?, .shadow?, .depth?,
+    #                 (objects | select(has("depth") == false))
+    #  ) ) | map(s(.)) | from_entries' > yarn-list.json
+
+    ${mkYarnListJson}
+    echo ${mkYarnNix}
+
+    return
     yarnlock2nix() {
       node -e '
         const lockfile = require("@yarnpkg/lockfile");
         const semver = require("semver");
         const fs = require("fs");
 
+        const yarnList = fs.readFileSync("yarn-list.json", "utf8");
+        const yarnListJson = JSON.parse(yarnList);
+
+        const walklist = (path, tree) => {
+          let fsfolders = [];
+          let jsfolders = [];
+
+          if (fs.existsSync(path)) {
+            let atfolders = [];
+            fsfolders = fs.readdirSync(path).filter(
+              p => p != ".bin" && p != ".yarn-integrity"
+            ).filter(
+              p => p[0] !== "@" || !atfolders.push(p)
+            );
+            atfolders.forEach(atfolder => {
+              fsfolders.concat(fs.readdirSync(path + "/" + atfolder).filter(
+                p => p != ".bin" && p != ".yarn-integrity"
+              ))
+            });
+          }
+
+          const siblings  = Object.keys(tree);
+
+          siblings.forEach(attr => {
+            const module = tree[attr];
+            const name = attr.match(/(@?[^@]+)@(.*)/)[1];
+            const version = attr.match(/(@?[^@]+)@(.*)/)[2];
+            const location = path + "/" + name;
+            
+            if (!fs.existsSync(location)) {
+              console.log("fs not found: ", location, version);
+            }
+            jsfolders.push(name);
+            walklist(location + "/node_modules", module);
+          })
+          fsfolders.forEach(folder => {
+            if (jsfolders.indexOf(folder) == -1) {
+              console.log("js not found: ", path + "/" + folder);
+            }
+          });
+        }
+        walklist("node_modules_", yarnListJson);
+        process.exit(0);
+
         const yarnLock = fs.readFileSync("yarn.lock", "utf8");
+        const yarnIntegrity = fs.readFileSync("node_modules_/.yarn-integrity", "utf8");
         const pkgFile = fs.readFileSync("package.json", "utf8");
         const yarnJson = lockfile.parse(yarnLock).object;
         const pkgJson = JSON.parse(pkgFile);
+        const yarnIntegrityJson = JSON.parse(yarnIntegrity);
         const keys = Object.keys;
         const entries = o => keys(o).map(k => [k, o[k]]);
 
@@ -97,26 +206,26 @@ stdenv.mkDerivation {
         const depsToNixString = pkg => {
           const deps = pkg.get("dependencies");
           if (deps.size) {
-            return "{\n"
+            return "[\n"
               + Array.from(deps.keys()).map(
-                  d => `              "''${d}" = pkgs."''${d}";`
+                  d => `              "''${d}"`
                 ).join("\n")
-              + "\n            }";
+              + "\n            ]";
           }
-          return "{}";
+          return "[]";
         };
 
         const pkgToNixString = (pkg) => {
-          return `  "''${pkg.get("attr")}" = nodeEnv.buildYarnPackage {
+          return `  "''${pkg.get("attr")}" = {
             packageName = "''${pkg.get("packageName")}";
             version = "''${pkg.get("version")}";
             src = ''${srcToNixString(pkg)};
             dependencies = ''${depsToNixString(pkg)};
-            seen = [ "''${pkg.get("attr")}" ];
+            toplevel = ''${pkg.get("toplevel")};
             };`
         }
 
-        const fromYarnJson = (name, version) => {
+        const fromYarnJson = (name, version, toplevel) => {
           const semver = getAlias(name, version);
           const yarnPkg = yarnJson[name + "@" + semver];
           const pkg = new Map();
@@ -133,6 +242,8 @@ stdenv.mkDerivation {
 
           pkg.set("src", src);
           pkg.set("dependencies", new Map());
+
+          pkg.set("toplevel", toplevel || false);
           
           if (yarnPkg.dependencies) {
             const d = pkg.get("dependencies");
@@ -147,7 +258,7 @@ stdenv.mkDerivation {
         const addIntoLevel = (level, name, version) => {
           level.set(
             getAttr(name, version),
-            fromYarnJson(name, version)
+            fromYarnJson(name, version, level === toplevel)
           );
         }
 
@@ -187,58 +298,23 @@ stdenv.mkDerivation {
           addResolved(name, entry.version, semver);
         });
 
+        yarnIntegrityJson.topLevelPatterns.forEach(pattern => {
+          const [ name, version ] = splitKey(pattern);
+          addToplevel(name, version);
+        });
+
         aliases.forEach((versions, name) => {
-          let alternatives = resolved.get(name);
-          let addTop;
-
-          if (alternatives.size === 1) {
-            addTop = versions.keys().next().value;
+          if (versions.size === 1) {
+            addToplevel(name, versions.keys().next().value);
           }
-          else if (
-            pkgJson.hasOwnProperty("dependencies")
-            && pkgJson.dependencies.hasOwnProperty(name)
-          ) {
-            let version = pkgJson.dependencies[name];
-
-            if (alternatives.has(version) || versions.has(version)) {
-              addTop = version;
-            } else {
-              console.error(
-                "dependency \"%s@%s\" not found in yarn.lock or package.json",
-                name, version
-              )
-              process.exit(1);
-            }
+          else
+          {
+            Array.from(versions.keys()).forEach(version => {
+              if (!toplevel.has(getAttr(name, version))) {
+                addSublevel(name, version);
+              }
+            });
           }
-          else if (
-            pkgJson.hasOwnProperty("devDependencies")
-            && pkgJson.devDependencies.hasOwnProperty(name)
-          ) {
-            let version = pkgJson.devDependencies[name];
-
-            if (alternatives.has(version) || versions.has(version)) {
-              addTop = version;
-            } else {
-              console.error(
-                "devDependency \"%s@%s\" not found in yarn.lock or package.json",
-                name, version
-              )
-              process.exit(1);
-            }
-          }
-          
-          if (!addTop) {
-            const s = Array.from(alternatives.keys()).sort(semver.rcompare);
-            addTop = s[0];
-          }
-
-          addToplevel(name, addTop);
-            
-          alternatives.forEach((_, version) => {
-            if (version !== addTop && !toplevel.has(getAttr(name, version))) {
-              addSublevel(name, version);
-            }
-          });
         });
 
         const clearDependencies = (level) => {
@@ -252,8 +328,8 @@ stdenv.mkDerivation {
           });
         }
 
-        //clearDependencies(toplevel);
-        //clearDependencies(sublevel);
+        clearDependencies(toplevel);
+        clearDependencies(sublevel);
 
         console.log(`{nodeEnv, fetchurl, fetchgit, globalBuildInputs ? [], overrides ? {}}:
 
@@ -267,11 +343,13 @@ rec { pkgs = {
 `);
       '
     }
-    yarnlock2nix | tee nodePackages/node-packages.nix
+    yarnlock2nix \
+    #  | tee nodePackages/node-packages.nix
+    exit 0
     cd nodePackages
     #rm -fr ../node_modules
     #nix-build -o ../node_modules
-    nix-build -o node_modules --show-trace
+    nix-build -j 8 -o node_modules --show-trace
     cd ..
 
     #mkdir node_modules

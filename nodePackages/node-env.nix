@@ -308,58 +308,89 @@ let
     '';
   };
 
-  buildYarnPackage = { packageName, version, dependencies ? {}, seen ? [],... }@args:
+  buildYarnPackage = { node_modules, packageName, version, dependencies ? {}, seen ? [],... }@args:
   let
     clean_name = builtins.replaceStrings ["@" "/"] ["-" "-"] packageName;
-    clean_args = builtins.removeAttrs args [ "dependencies" ];
-  in 
-    stdenv.lib.makeOverridable stdenv.mkDerivation (args // {
+    clean_args = builtins.removeAttrs args [ "node_modules" ];
+    dep_node_modules = builtins.filter (d: d != null)
+      (map (attr:
+        if (builtins.elem attr seen) == false
+        then
+          buildYarnPackage {
+            inherit node_modules;
+            inherit (node_modules.${attr}) src packageName version dependencies;
+            seen = seen ++ [ attr ] ++ dependencies;
+          }
+        else null)
+      dependencies);
+    fromPackageJson = file: builtins.fromJSON (builtins.readFile file);
+  in
+    stdenv.lib.makeOverridable stdenv.mkDerivation (clean_args // rec {
       name = "node-${clean_name}-${version}";
 
       buildInputs = [ tarWrapper python nodejs ]
         ++ stdenv.lib.optional (stdenv.isLinux) utillinux
-        ++ args.buildInputs or [];
+        ++ args.buildInputs or []
+        ++ dep_node_modules;
 
       inherit seen;
 
+      scope = if builtins.substring 0 1 packageName == "@"
+        then builtins.elemAt (builtins.match "(@.*)/.*" packageName) 0
+        else "";
+
+      enableParallelBuilding = true;
+      #enable while fixing packages for faster processing
+      preferLocalBuild = true;
+
       patchPhase = args.patchPhase or ''
         runHook prePatch
-        find . -name .babelrc -exec rm \{\} \;
 
-        ${stdenv.lib.concatMapStringsSep " " (attr: ''
-          # TODO break infinite recursion
-          ${if (builtins.elem attr seen) == false
-            #&& (builtins.length seen) < 2
-            #&& d.name != "node-babel-register-6.18.0"
-            #&& d.name != "node-babel-register-6.26.0" 
-            #&& d.name != "node-es5-ext-0.10.12" 
-            #&& d.name != "node-es6-iterator-2.0.0" 
-            #&& d.name != "node-d-0.1.1"
-          then
-            let
-              old = dependencies.${attr};
-              new = buildYarnPackage {
-                inherit (old) packageName version dependencies;
-                seen = seen ++ (builtins.attrNames dependencies);
-              };
-              #new = old.override
-              #(old: {
-              #  seen = seen ++ (builtins.attrNames dependencies);
-              #});
-            in with new; ''
-              local packageName="${packageName}"
+        if [[ -d bin ]] ; then
+          chmod -f 755 bin/*
+        fi
+        if [[ -d dist/bin ]] ; then
+          chmod -f 755 dist/bin/*
+        fi
+    
+        ${stdenv.lib.concatMapStringsSep "\n"
+          (package: ''
+            local DOTBIN=node_modules/.bin
+            local MODULE=node_modules/${package.packageName}
+
+            mkdir -p node_modules/${package.scope}
+            mkdir -p $DOTBIN
             
-              if [[ "$packageName" =~ ^@ ]] ; then
-                mkdir -p node_modules/''${packageName%%/*}
-              fi
-            
-              mkdir -p node_modules
+            echo linking ${package} to $MODULE
+            ln -s ${package} $MODULE
 
-              echo linking ${new} to node_modules/$packageName
-              ln -s ${new} node_modules/$packageName
-
-            '' else ""}
-        '') (builtins.attrNames dependencies)}
+            ${let
+              j = {}; #}fromPackageJson
+                #(./. + "/node_modules/${package.packageName}/package.json");
+            in
+              if builtins.hasAttr "bin" j then
+                if builtins.isString j.bin then ''
+                  if [[ -d ${j.bin} ]] ; then
+                    for bin in ${j.bin}/* ; do
+                      #echo dir chmod 755 $DOTBIN/$(basename $bin)
+                      #chmod 755 $DOTBIN/$(basename $bin)
+                      ln -s $bin $DOTBIN/$(basename $bin)
+                    done
+                  else
+                    #echo file chmod 755 $DOTBIN/$(basename $bin)
+                    #chmod 755 $DOTBIN/$(basename $bin)
+                    ln -s $bin $DOTBIN/$(basename $bin)
+                  fi
+                '' else if builtins.isAttrs j.bin then
+                  stdenv.lib.concatMapStringsSep "\n" (b: ''
+                    #echo attr chmod 755 $MODULE/${builtins.getAttr b j.bin}
+                    #chmod 755 $MODULE/${builtins.getAttr b j.bin}
+                    ln -s $MODULE/${builtins.getAttr b j.bin} $DOTBIN/${b}
+                  '') (builtins.attrNames j.bin)
+                else ""
+              else ""
+            }
+          '') dep_node_modules}
 
         runHook postPatch
       '';

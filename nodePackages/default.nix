@@ -86,7 +86,7 @@ let
   #    chmod 755 dist/bin/*
   #  '';
   #});
-  #"webpack#3.11.0" = nodePackages."webpack@3.11.0".override (attrs: {
+  #"webpack@3.11.0" = nodePackages."webpack@3.11.0".override (attrs: {
   #  postPatch = ''
   #    sed -i 's/return require(localWebpack);//' bin/webpack.js
   #  '';
@@ -95,7 +95,7 @@ let
   #    chmod 755 bin/*
   #  '';
   #});
-  "webpack#1.14.0" = nodePackages."webpack@1.14.0".override (attrs: {
+  "webpack@1.14.0" = nodePackages."webpack@1.14.0" // {
     postPatch = ''
       sed -i 's/return require(localWebpack);//' bin/webpack.js
     '';
@@ -103,7 +103,7 @@ let
     #  patchShebangs bin
     #  chmod 755 bin/*
     #'';
-  });
+  };
   #"uglify-es@3.3.9" = nodePackages."uglify-es@3.3.9".override (attrs: {
   #  postBuild = ''
   #    patchShebangs bin
@@ -115,9 +115,14 @@ in
   pkgs.runCommand ("daedalus-0.0.1-node_modules") {} ''
     mkdir -p $out/.bin
     ${pkgs.lib.concatMapStringsSep "\n"
-    (dep: ''
+    (attr: if buildPackages.${attr}.toplevel then
+    let
+      dep = nodeEnv.buildYarnPackage (buildPackages.${attr} // {
+        node_modules = buildPackages;
+      });
+    in ''
       
-      echo "linking node dependency ${dep.name}"
+      echo "linking node dependency ${dep.packageName}"
       
       local packageName="${dep.packageName}"
             
@@ -136,8 +141,15 @@ in
           test -e $target || ln -sT $bin $target
         done
       fi
-    '')
-    (pkgs.lib.attrValues buildPackages)}
+    '' else "")
+    (pkgs.lib.attrNames buildPackages)
+    #[
+    # "7zip@0.0.6"
+    # "@kadira/react-split-pane@1.4.7"
+    # #"json-stringify-safe@5.0.1"
+    # "@kadira/storybook-addon-actions@1.1.1"
+    #]
+  }
   ''
 #ls ../nodePackages/node_modules/*/package.json | xargs -I@ jq -r --arg dir "@" '["ln -sT $(dirname ", $dir, ") ", .name] | add' @ > link.sh && chmod 755 link.sh")"]
 #{
